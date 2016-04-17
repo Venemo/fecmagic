@@ -59,6 +59,26 @@ namespace fecmagic {
 #endif
     }
     
+    /**
+     * Returns the number of 1 bits in the given number.
+     */
+    inline uint8_t computePopcount(unsigned x) {
+#if defined(__GNUC__)
+        return __builtin_popcount(x);
+#elif defined(_MSC_VER)
+        return __popcnt(x);
+#else
+#   error "Unknown compiler, write popcount function"
+#endif
+    }
+    
+    /**
+     * Returns the hamming distance between two numbers.
+     */
+    inline uint8_t computeHammingDistance(unsigned x, unsigned y) {
+        return computePopcount(x ^ y);
+    }
+    
 }
 
 #endif // FECMAGIC_GLOBAL_H

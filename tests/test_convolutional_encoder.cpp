@@ -33,8 +33,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include "../src/convolutional-encoder.h"
 #include "../src/binaryprint.h"
+#include "../src/convolutional-encoder.h"
+#include "../src/convolutional-decoder.h"
 
 using namespace std;
 using namespace fecmagic;
@@ -184,8 +185,17 @@ int main() {
         cout << "nope, k=3, rate=1/2 doesn't work!" << endl;
     }
     
+    ConvolutionalDecoder<15, 3, uint8_t, 7, 5> dec3;
+    uint8_t decoded[] = { 0, 0, 0 };
     
+    dec3.decodeBlock(expectedOutput, 5, decoded);
     
+    if (0 == memcmp(decoded, input, 2)) {
+        cout << "yup, k=3, rate=1/2 decode works!" << endl;
+    }
+    else {
+        cout << "nope, k=3, rate=1/2 decode doesn't work!" << endl;
+    }
     
     return 0;
 }
