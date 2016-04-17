@@ -50,8 +50,6 @@ namespace fecmagic {
         static_assert((sizeof(TShiftReg) * 8) >= ConstraintLength, "The shift register must be able to hold the constraint length of the code.");
     
     private:
-        // In case TShiftReg is longer than our actual shift register, we use this mask to make sure we only use the bits needed
-        constexpr static TShiftReg shiftRegMask_ = static_cast<TShiftReg>(::std::numeric_limits<TShiftReg>::max() << ConstraintLength);
         
         // Number of outputs of the convolutional code (each polynomial corresponds to an output)
         constexpr static uint32_t outputCount_ = sizeof...(Polynomials);
@@ -88,7 +86,7 @@ namespace fecmagic {
             uint32_t outBitPos = 7;
             
             // Go through each input byte
-            while (inAddr < inputSize || (shiftReg & shiftRegMask_) != 0) {
+            while (inAddr < inputSize || shiftReg != 0) {
                 // Shift the register right
                 shiftReg >>= 1;
                 

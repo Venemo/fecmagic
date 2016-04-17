@@ -159,14 +159,33 @@ int main() {
     cout << "poly1 = " << BinaryPrint<uint8_t>(poly1) << endl;
     cout << "poly2 = " << BinaryPrint<uint8_t>(poly2) << endl;
     
+    // Test the encoder with the K=7, rate=1/2 (Voyager) code
     const char *testInput;
-    
     testInput = "Hello!";
     cout << "test with '" << testInput << "': " << testConvolutionalCode(strlen(testInput) + 1, reinterpret_cast<const uint8_t*>(testInput)) << endl;
     testInput = "Hello world!";
     cout << "test with '" << testInput << "': " << testConvolutionalCode(strlen(testInput) + 1, reinterpret_cast<const uint8_t*>(testInput)) << endl;
     testInput = "Good morning, Captain! Are we awesome yet?";
     cout << "test with '" << testInput << "': " << testConvolutionalCode(strlen(testInput) + 1, reinterpret_cast<const uint8_t*>(testInput)) << endl;
+    
+    // Test the encoder for the code that is described here:
+    // http://home.netcom.com/~chip.f/viterbi/algrthms.html
+    ConvolutionalEncoder<3, uint8_t, 7, 5> enc3;
+    uint8_t input[] = { 0b01011100, 0b10100010 };
+    uint8_t output[] = { 0, 0, 0, 0, 0 };
+    
+    enc3.encodeBlock(input, 2, output);
+    uint8_t expectedOutput[] = { 0b00111000, 0b01100111, 0b11100010, 0b11001110, 0b11000000 };
+    
+    if (0 == memcmp(output, expectedOutput, 5)) {
+        cout << "yup, k=3, rate=1/2 works!" << endl;
+    }
+    else {
+        cout << "nope, k=3, rate=1/2 doesn't work!" << endl;
+    }
+    
+    
+    
     
     return 0;
 }
