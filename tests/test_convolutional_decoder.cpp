@@ -24,6 +24,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <random>
 #include "../src/binaryprint.h"
 #include "../src/convolutional-encoder.h"
 #include "../src/convolutional-decoder.h"
@@ -35,7 +36,7 @@ constexpr uint8_t poly1 = 0x5b;
 constexpr uint8_t poly2 = 0x79;
 
 template<typename TEnc, typename TDec>
-void testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
+bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     size_t dataSize = strlen(data) + 1;
     size_t encodedSize = dataSize * 2 + 1;
     uint8_t *encInput = new uint8_t[dataSize];
@@ -45,39 +46,110 @@ void testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     memset(encOutput, 0, encodedSize);
     memset(decOutput, 0, dataSize + 1);
     
-    for (uint32_t i = 0; i < dataSize; i++) {
-        cout << BinaryPrint<uint8_t>(encInput[i]) << " ";
-    }
-    cout << endl;
+//    for (uint32_t i = 0; i < dataSize; i++) {
+//        cout << BinaryPrint<uint8_t>(encInput[i]) << " ";
+//    }
+//    cout << endl;
     
     enc.encodeBlock(encInput, dataSize, encOutput);
     
-    for (uint32_t i = 0; i < encodedSize; i++) {
-        cout << BinaryPrint<uint8_t>(encOutput[i]) << " ";
-    }
-    cout << endl;
+//    for (uint32_t i = 0; i < encodedSize; i++) {
+//        cout << BinaryPrint<uint8_t>(encOutput[i]) << " ";
+//    }
+//    cout << endl;
     
     dec.decodeBlock(encOutput, encodedSize, decOutput);
     
-    for (uint32_t i = 0; i < dataSize + 1; i++) {
-        cout << BinaryPrint<uint8_t>(decOutput[i]) << " ";
-    }
-    cout << endl;
+//    for (uint32_t i = 0; i < dataSize + 1; i++) {
+//        cout << BinaryPrint<uint8_t>(decOutput[i]) << " ";
+//    }
+//    cout << endl;
     
     bool success = (0 == memcmp(decOutput, encInput, dataSize));
-    cout << success << endl;
     
     delete [] encInput;
     delete [] encOutput;
     delete [] decOutput;
+    
+    return success;
+}
+
+template<typename TEnc, typename TDec>
+bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, uint32_t errorCount) {
+    size_t dataSize = strlen(data) + 1;
+    size_t encodedSize = dataSize * 2 + 1;
+    uint8_t *encInput = new uint8_t[dataSize];
+    uint8_t *encOutput = new uint8_t[encodedSize];
+    uint8_t *decOutput = new uint8_t[dataSize + 1];
+    memcpy(encInput, data, dataSize);
+    memset(encOutput, 0, encodedSize);
+    memset(decOutput, 0, dataSize + 1);
+    
+//    for (uint32_t i = 0; i < dataSize; i++) {
+//        cout << BinaryPrint<uint8_t>(encInput[i]) << " ";
+//    }
+//    cout << endl;
+    
+    enc.encodeBlock(encInput, dataSize, encOutput);
+    
+//    for (uint32_t i = 0; i < encodedSize; i++) {
+//        cout << BinaryPrint<uint8_t>(encOutput[i]) << " ";
+//    }
+//    cout << endl;
+    
+    // Initialize random engine
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_real_distribution<double> dist(1.0, 10.0);
+    
+    // Add bit errors
+    for (uint32_t i = 0; i < errorCount; i++) {
+        uint32_t randomNumber = dist(mt);
+        uint32_t byte = randomNumber / 8;
+        uint32_t bit = randomNumber - (byte * 8);
+        
+        encOutput[byte] ^= (1 << bit);
+    }
+    
+    dec.decodeBlock(encOutput, encodedSize, decOutput);
+    
+//    for (uint32_t i = 0; i < dataSize + 1; i++) {
+//        cout << BinaryPrint<uint8_t>(decOutput[i]) << " ";
+//    }
+//    cout << endl;
+    
+    bool success = (0 == memcmp(decOutput, encInput, dataSize));
+    
+    delete [] encInput;
+    delete [] encOutput;
+    delete [] decOutput;
+    
+    return success;
 }
 
 int main() {
     ConvolutionalEncoder<7, uint8_t, poly1, poly2> encoder;
     ConvolutionalDecoder<35, 7, uint8_t, poly1, poly2> decoder;
     
-    testEncodeAndDecode(encoder, decoder, "Hello!");
-    testEncodeAndDecode(encoder, decoder, "Good morning, Captain! Are we awesome yet?");
+    cout << "Testing basic" << endl;
+    assert(testEncodeAndDecode(encoder, decoder, "Hello!"));
+    assert(testEncodeAndDecode(encoder, decoder, "Good morning, Captain! Are we awesome yet?"));
+    
+    cout << "Testing with 1-bit errors" << endl;
+    for (uint32_t i = 0; i < 100; i++) {
+        assert(testEncodeAndDecodeWithBitErrors(encoder, decoder, "Hello!", 1));
+    }
+    cout << "OK" << endl;
+    cout << "Testing with 2-bit errors" << endl;
+    for (uint32_t i = 0; i < 100; i++) {
+        assert(testEncodeAndDecodeWithBitErrors(encoder, decoder, "Hello world! Are we awesome yet?", 2));
+    }
+    cout << "OK" << endl;
+    cout << "Testing with 3-bit errors" << endl;
+    for (uint32_t i = 0; i < 100; i++) {
+        assert(testEncodeAndDecodeWithBitErrors(encoder, decoder, "Hello world! Are we awesome yet?", 3));
+    }
+    cout << "OK" << endl;
     
     return 0;
 }
