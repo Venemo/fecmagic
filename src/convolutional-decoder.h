@@ -220,8 +220,9 @@ namespace fecmagic {
             bool firstBitIgnored = false;
             
             while (inAddr < inputSize) {
-                // Get necessary number of input bits
                 TShiftReg receivedBits = 0;
+                
+                // Get necessary number of input bits
                 for (uint32_t o = 0; o < outputCount_; o++) {
                     receivedBits <<= 1;
                     receivedBits |= ((input[inAddr] >> inBitPos) & 1);
@@ -317,7 +318,10 @@ namespace fecmagic {
             // Go through the state with lowest error metric backwards, this will go through them in reversed order
             for (uint32_t i = Depth - 1; i > 0; i--) {
                 DEBUG_PRINT("at the end, got out bit: " << (uint32_t)stateWithOutput->presumedInputBit << " state=" << (uint32_t)stateWithOutput->state);
-                assert(stateWithOutput->accumulatedErrorMetric == 0);
+                
+                // Useful for debugging when decoding without bit errors
+                //assert(stateWithOutput->accumulatedErrorMetric == 0);
+                
                 remainingOutputBits[i - 1] = stateWithOutput->presumedInputBit;
                 stateWithOutput = stateWithOutput->previous;
             }
