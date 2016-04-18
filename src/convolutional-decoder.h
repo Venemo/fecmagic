@@ -252,8 +252,11 @@ namespace fecmagic {
             while (inAddr < inputSize) {
                 TShiftReg receivedBits = 0;
                 
-                // Get necessary number of input bits
-                for (uint32_t o = 0; o < outputCount_; o++) {
+                // Get necessary number of input bits, one by one.
+                // NOTE: We need to check inAddr vs. inputSize here again,
+                //       because if the output count is odd, inAddr might go
+                //       out of range.
+                for (uint32_t o = 0; o < outputCount_ && inAddr < inputSize; o++) {
                     // Read current input bit
                     receivedBits <<= 1;
                     receivedBits |= ((input[inAddr] >> inBitPos) & 1);
