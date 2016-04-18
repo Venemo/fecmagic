@@ -138,7 +138,10 @@ bool testConvolutionalCode(size_t inputSize, const uint8_t *inputData) {
     // NOTE: the ConvolutionalEncoder class shifts in bits from the other direction,
     //       so we need to reverse the polynomials as well, to get the same output.
     ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> encoder;
-    encoder.encodeBlock(input, inputSize, output1);
+    
+    encoder.reset(output1);
+    encoder.encode(input, inputSize);
+    encoder.flush();
     
     // Encode output using old (known to work) algorithm
     uint8_t *output2 = new uint8_t[outputSize];
@@ -175,7 +178,9 @@ int main() {
     uint8_t input[] = { 0b01011100, 0b10100010 };
     uint8_t output[] = { 0, 0, 0, 0, 0 };
     
-    enc3.encodeBlock(input, 2, output);
+    enc3.reset(output);
+    enc3.encode(input, 2);
+    enc3.flush();
     uint8_t expectedOutput[] = { 0b00111000, 0b01100111, 0b11100010, 0b11001110, 0b11000000 };
     
     if (0 == memcmp(output, expectedOutput, 5)) {

@@ -24,10 +24,9 @@
 #ifndef CONVOLUTIONAL_ENCODER
 #define CONVOLUTIONAL_ENCODER
 
-#include <cstdint>
-#include <initializer_list>
 #include <limits>
-#include <tuple>
+#include <cstdint>
+#include <cassert>
 
 #include "fecmagic-global.h"
 
@@ -58,13 +57,79 @@ namespace fecmagic {
         
         // Unpack variadic template argument, to allow access to each polynomial
         constexpr static TShiftReg polynomials_[sizeof...(Polynomials)] = { Polynomials... };
-
+        
+        // Output
+        uint8_t *output;
+        
+        // Output position
+        size_t outAddr;
+        uint32_t outBitPos;
+        
+        // The shift register
+        TShiftReg shiftReg = 0;
+        
+        inline void produceOutput() {
+            // Compute outputs from the current state of the encoder
+            for (uint32_t o = 0; o < outputCount_; o++) {
+                // Compute output and put it to its correct place
+                output[outAddr] |= (::fecmagic::computeParity(polynomials_[o] & shiftReg) << outBitPos);
+                
+                // Advance output bit position
+                if (outBitPos == 0) {
+                    outAddr++;
+                    outBitPos = 7;
+                }
+                else {
+                    outBitPos--;
+                }
+            }
+        }
+        
     public:
     
         /**
          * @brief Creates a convolutional encoder
          */
-        constexpr inline explicit ConvolutionalEncoder() { }
+        constexpr inline explicit ConvolutionalEncoder(void *output = nullptr) {
+            this->reset(output);
+        }
+        
+        /**
+         * @brief Copy constructor. Intentionally disabled for this class.
+         */
+        ConvolutionalEncoder(const ConvolutionalEncoder &other) = delete;
+        
+        /**
+         * @brief Move constructor.
+         */
+        ConvolutionalEncoder(const ConvolutionalEncoder &&other) {
+            this->operator=(other);
+        }
+        
+        /**
+         * @brief Copy assignment operator. Intentionally disabled for this class.
+         */
+        ConvolutionalEncoder &operator=(const ConvolutionalEncoder &other) = delete;
+        
+        /**
+         * @brief Move assignment operator.
+         */
+        ConvolutionalEncoder &operator=(const ConvolutionalEncoder &&other) {
+            this->output = std::move(other.output);
+            this->shiftReg = std::move(other.shiftReg);
+            this->outAddr = std::move(other.outAddr);
+            this->outBitPos = std::move(other.outBitPos);
+        };
+        
+        /**
+         * @brief Resets the convolutional encoder and sets the given output.
+         */
+        void reset(void *output) {
+            this->output = reinterpret_cast<uint8_t*>(output);
+            this->shiftReg = 0;
+            this->outAddr = 0;
+            this->outBitPos = 7;
+        }
         
         /**
          * @brief Returns the size of the output you need to allocate for a given input.
@@ -88,22 +153,22 @@ namespace fecmagic {
          * The caller of this method is responsible for making sure that enough memory is
          * allocated to fit the output.
          *
-         * This method is not suitable for streaming.
+         * This method is suitable for streaming.
          */
-        void encodeBlock(const uint8_t *input, size_t inputSize, uint8_t *output) {
-            // The shift register
-            TShiftReg shiftReg = 0;
+        void encode(const uint8_t *input, size_t inputSize) {
+            if (inputSize == 0) {
+                return;
+            }
+            
+            assert(input != nullptr);
+            assert(output != nullptr);
             
             // Input position
             size_t inAddr = 0;
             uint32_t inBitPos = 7;
             
-            // Output position
-            size_t outAddr = 0;
-            uint32_t outBitPos = 7;
-            
             // Go through each input byte
-            while (inAddr < inputSize || shiftReg != 0) {
+            while (inAddr < inputSize) {
                 // Shift the register right
                 shiftReg >>= 1;
                 
@@ -113,20 +178,8 @@ namespace fecmagic {
                     shiftReg |= (((input[inAddr] >> inBitPos) & 1) << (ConstraintLength - 1));
                 }
                 
-                // Compute outputs from the current state of the encoder
-                for (uint32_t o = 0; o < outputCount_; o++) {
-                    // Compute output and put it to its correct place
-                    output[outAddr] |= (::fecmagic::computeParity(polynomials_[o] & shiftReg) << outBitPos);
-                    
-                    // Advance output bit position
-                    if (outBitPos == 0) {
-                        outAddr++;
-                        outBitPos = 7;
-                    }
-                    else {
-                        outBitPos--;
-                    }
-                }
+                // Produce output
+                produceOutput();
                 
                 // Advance input bit position
                 if (inBitPos == 0) {
@@ -136,6 +189,19 @@ namespace fecmagic {
                 else {
                     inBitPos--;
                 }
+            }
+        }
+        
+        /**
+         * @brief Flushes the encoder, outputting the remaining bits until the shift register is empty.
+         */
+        void flush() {
+            while (shiftReg != 0) {
+                // Shift the register right
+                shiftReg >>= 1;
+                
+                // Produce output
+                produceOutput();
             }
         }
         
