@@ -41,8 +41,10 @@ namespace fecmagic {
      * Template parameters:
      * - ConstraintLength: the constraint length of the code
      * - TShiftReg: unsigned integral type that can hold the shift register
-     * - Polynomials: the polynomials used for this convolutional code. Each polynomial corresponds to an output but, so in other words
-         the code rate is the reciproc of the number of polynomials.
+     * - Polynomials: the polynomials used for this convolutional code. Each polynomial
+     *   corresponds to an output but, so in other words the code rate is the reciproc
+     *   of the number of polynomials.
+     *
      */
     template<uint32_t ConstraintLength, typename TShiftReg = std::uint32_t, TShiftReg ...Polynomials>
     class ConvolutionalEncoder final {
@@ -63,6 +65,21 @@ namespace fecmagic {
          * @brief Creates a convolutional encoder
          */
         constexpr inline explicit ConvolutionalEncoder() { }
+        
+        /**
+         * @brief Returns the size of the output you need to allocate for a given input.
+         *
+         * Output size: give space to encoded bits and
+         * after that, allow the encoder to be flushed.
+         */
+        static inline uint32_t calculateOutputSize(uint32_t inputSize) {
+            // Number of bytes occupied by the constraint length
+            constexpr uint32_t constraintLengthBytes = (ConstraintLength / 8) + (((ConstraintLength % 8) == 0) ? 0 : 1);
+            // Total output size
+            uint32_t outputSize = (inputSize * outputCount_) + constraintLengthBytes;
+            
+            return outputSize;
+        }
         
         /**
          * @brief Encodes the given block.

@@ -45,13 +45,14 @@ constexpr uint8_t poly2 = 0x79;
 template<typename TEnc, typename TDec>
 bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     size_t dataSize = strlen(data) + 1;
-    size_t encodedSize = dataSize * TDec::reciprocCodeRate() + 1;
+    size_t encodedSize = TEnc::calculateOutputSize(dataSize);
+    size_t decodedSize = TDec::calculateOutputSize(encodedSize);
     uint8_t *encInput = new uint8_t[dataSize];
     uint8_t *encOutput = new uint8_t[encodedSize];
-    uint8_t *decOutput = new uint8_t[dataSize + 1];
+    uint8_t *decOutput = new uint8_t[decodedSize];
     memcpy(encInput, data, dataSize);
     memset(encOutput, 0, encodedSize);
-    memset(decOutput, 0, dataSize + 1);
+    memset(decOutput, 0, decodedSize);
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < dataSize; i++) {
@@ -72,7 +73,7 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     dec.decodeBlock(encOutput, encodedSize, decOutput);
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
-    for (uint32_t i = 0; i < dataSize + 1; i++) {
+    for (uint32_t i = 0; i < decodedSize; i++) {
         cout << BinaryPrint<uint8_t>(decOutput[i]) << " ";
     }
     cout << endl;
@@ -90,13 +91,14 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
 template<typename TEnc, typename TDec>
 bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, uint32_t errorCount) {
     size_t dataSize = strlen(data) + 1;
-    size_t encodedSize = dataSize * TDec::reciprocCodeRate() + 1;
+    size_t encodedSize = TEnc::calculateOutputSize(dataSize);
+    size_t decodedSize = TDec::calculateOutputSize(encodedSize);
     uint8_t *encInput = new uint8_t[dataSize];
     uint8_t *encOutput = new uint8_t[encodedSize];
-    uint8_t *decOutput = new uint8_t[dataSize + 1];
+    uint8_t *decOutput = new uint8_t[decodedSize];
     memcpy(encInput, data, dataSize);
     memset(encOutput, 0, encodedSize);
-    memset(decOutput, 0, dataSize + 1);
+    memset(decOutput, 0, decodedSize);
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < dataSize; i++) {
@@ -132,7 +134,7 @@ bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, ui
     dec.decodeBlock(encOutput, encodedSize, decOutput);
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
-    for (uint32_t i = 0; i < dataSize + 1; i++) {
+    for (uint32_t i = 0; i < decodedSize; i++) {
         cout << BinaryPrint<uint8_t>(decOutput[i]) << " ";
     }
     cout << endl;

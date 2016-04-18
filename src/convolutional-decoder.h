@@ -41,6 +41,22 @@
 
 namespace fecmagic {
 
+    /**
+     * @brief Decoder that can decode convolutional code.
+     * 
+     * This is a customizable decoder that can process varying convolutional codes.
+     * It implements the Viterbi algorithm, and can be customized for your own
+     * choice of convolutional code.
+     *
+     * Template parameters:
+     * - Depth: the size of the state space (in other words, the number of possible
+     *   steps that the decoder will keep in memory at once.
+     * - ConstraintLength: the constraint length of the code
+     * - TShiftReg: unsigned integral type that can hold the shift register
+     * - Polynomials: the polynomials used for this convolutional code. Each polynomial
+     *   corresponds to an output but, so in other words the code rate is the reciproc
+     *   of the number of polynomials.
+     */
     template<uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg = std::uint32_t, TShiftReg ...Polynomials>
     class ConvolutionalDecoder final {
         
@@ -177,35 +193,52 @@ namespace fecmagic {
     
     public:
         /**
-          * @brief Default constructor.
-          */
+         * @brief Default constructor.
+         */
         constexpr inline explicit ConvolutionalDecoder() { }
         
         /**
-          * @brief Copy constructor. Intentionally disabled for this class.
-          */
+         * @brief Copy constructor. Intentionally disabled for this class.
+         */
         ConvolutionalDecoder(const ConvolutionalDecoder &other) = delete;
         
         /**
-          * @brief Move constructor.
-          */
+         * @brief Move constructor.
+         */
         ConvolutionalDecoder(const ConvolutionalDecoder &&other) { }
         
         /**
-          * @brief Copy assignment operator. Intentionally disabled for this class.
-          */
+         * @brief Copy assignment operator. Intentionally disabled for this class.
+         */
         ConvolutionalDecoder &operator=(const ConvolutionalDecoder &other) = delete;
         
         /**
-          * @brief Move assignment operator.
-          */
+         * @brief Move assignment operator.
+         */
         ConvolutionalDecoder &operator=(const ConvolutionalDecoder &&other) { };
         
         /**
-          * @brief Returns the reciproc of the code rate.
-          */
+         * @brief Returns the reciproc of the code rate.
+         */
         constexpr static inline uint32_t reciprocCodeRate() {
             return outputCount_;
+        }
+        
+        /**
+         * @brief Returns the size of the output you need to allocate for a given input.
+         *
+         * Output size: space for the decoded output, and additional bytes
+         * are needed because the encoder is flushed and the decoder needs
+         * space to fill the decoded result of the flushed bits too. These
+         * are likely just going to be zeroes.
+         */
+        static inline uint32_t calculateOutputSize(uint32_t inputSize) {
+            // Number of bytes occupied by the constraint length
+            constexpr uint32_t constraintLengthBytes = (ConstraintLength / 8) + (((ConstraintLength % 8) == 0) ? 0 : 1);
+            // Total output size
+            uint32_t outputSize = (inputSize - constraintLengthBytes) / outputCount_ + constraintLengthBytes;
+            
+            return outputSize;
         }
         
         /**
