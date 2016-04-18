@@ -92,7 +92,7 @@ namespace fecmagic {
         /**
          * @brief Creates a convolutional encoder
          */
-        constexpr inline explicit ConvolutionalEncoder(void *output = nullptr) {
+        explicit ConvolutionalEncoder(void *output = nullptr) {
             this->reset(output);
         }
         

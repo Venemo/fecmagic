@@ -223,7 +223,7 @@ namespace fecmagic {
         /**
          * @brief Default constructor.
          */
-        constexpr inline explicit ConvolutionalDecoder(void *output = nullptr) {
+        explicit ConvolutionalDecoder(void *output = nullptr) {
             this->reset(output);
         }
         
