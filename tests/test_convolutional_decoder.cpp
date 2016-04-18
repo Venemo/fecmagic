@@ -161,7 +161,9 @@ int main() {
     cout << "Testing basic functionality (k=3, rate=1/3)" << endl;
     ConvolutionalEncoder<3, uint8_t, 7, 3, 5> enc2;
     ConvolutionalDecoder<15, 3, uint8_t, 7, 3, 5> dec2;
+    ConvolutionalDecoder<2, 3, uint8_t, 7, 3, 5> dec2_2;
     assert(testEncodeAndDecode(enc2, dec2, "Hello!"));
+    assert(testEncodeAndDecode(enc2, dec2_2, "Hello!"));
     cout << "OK" << endl;
     
     cout << "Testing basic functionality (k=3, rate=1/2)" << endl;

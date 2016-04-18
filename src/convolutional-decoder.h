@@ -62,7 +62,8 @@ namespace fecmagic {
         
         // Check template parameters using static asserts
         static_assert((sizeof(TShiftReg) * 8) >= ConstraintLength, "The shift register must be able to hold the constraint length of the code.");
-    
+        static_assert(Depth >= 2, "The Depth template parameter must be at least two.");
+        
     private:
     
         // Maximum error metric, represents infinity.
