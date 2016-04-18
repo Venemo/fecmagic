@@ -45,7 +45,7 @@ constexpr uint8_t poly2 = 0x79;
 template<typename TEnc, typename TDec>
 bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     size_t dataSize = strlen(data) + 1;
-    size_t encodedSize = dataSize * dec.reciprocCodeRate() + 1;
+    size_t encodedSize = dataSize * TDec::reciprocCodeRate() + 1;
     uint8_t *encInput = new uint8_t[dataSize];
     uint8_t *encOutput = new uint8_t[encodedSize];
     uint8_t *decOutput = new uint8_t[dataSize + 1];
@@ -90,7 +90,7 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
 template<typename TEnc, typename TDec>
 bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, uint32_t errorCount) {
     size_t dataSize = strlen(data) + 1;
-    size_t encodedSize = dataSize * 2 + 1;
+    size_t encodedSize = dataSize * TDec::reciprocCodeRate() + 1;
     uint8_t *encInput = new uint8_t[dataSize];
     uint8_t *encOutput = new uint8_t[encodedSize];
     uint8_t *decOutput = new uint8_t[dataSize + 1];

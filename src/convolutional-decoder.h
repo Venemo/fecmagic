@@ -123,7 +123,7 @@ namespace fecmagic {
         };
         
         // Gets the output of the convolutional encoder for the given state.
-        inline TShiftReg getEncoderOutput(TShiftReg shiftReg) {
+        static inline TShiftReg getEncoderOutput(TShiftReg shiftReg) {
             TShiftReg output = 0;
             for (uint32_t o = 0; o < outputCount_; o++) {
                 output <<= 1;
@@ -133,7 +133,7 @@ namespace fecmagic {
         }
         
         // Calculates error metric for the given current state assuming the specified presumed input bit.
-        inline void calculateErrorMetricForInput(const State &currentState, Step &nextStep, TShiftReg currentSt, TShiftReg receivedBits, uint8_t presumedInputBit) {
+        static inline void calculateErrorMetricForInput(const State &currentState, Step &nextStep, TShiftReg currentSt, TShiftReg receivedBits, uint8_t presumedInputBit) {
             assert(presumedInputBit == (presumedInputBit & 1));
         
             // Next shift register value for the presumed input bit
@@ -204,7 +204,7 @@ namespace fecmagic {
         /**
           * @brief Returns the reciproc of the code rate.
           */
-        constexpr inline uint32_t reciprocCodeRate() const {
+        constexpr static inline uint32_t reciprocCodeRate() {
             return outputCount_;
         }
         
