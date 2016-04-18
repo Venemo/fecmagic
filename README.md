@@ -12,8 +12,10 @@ Currently, we've got the following:
 
 * A generic block code algorithm that works with binary matrix operations, and has
   a generic method of syndrome-based decoding.
-* A generic convolutional encoder algorithm that is implemented using a variadic
-  template and can be configured to encode any convolutional code.
+* A generic convolutional codec that is implemented using variadic
+  templates and can be configured to work with any convolutional code.  
+  The encoder implements the classical "shift register" algorithm, and
+  the decoder implements a hard-decision Viterbi algorithm.
 
 And we have specialized codecs for:
 
