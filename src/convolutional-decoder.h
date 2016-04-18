@@ -34,7 +34,7 @@
 #ifdef CONVOLUTIONAL_DECODER_DEBUG
 #   include <iostream>
 #   include "binaryprint.h"
-#   define DEBUG_PRINT(x) (::std::cout << x << std::endl);
+#   define DEBUG_PRINT(x) (::std::cout << "[ConvolutionalDecoder] " << x << std::endl);
 #else
 #   define DEBUG_PRINT(x)
 #endif
@@ -176,7 +176,37 @@ namespace fecmagic {
         }
     
     public:
+        /**
+          * @brief Default constructor.
+          */
         constexpr inline explicit ConvolutionalDecoder() { }
+        
+        /**
+          * @brief Copy constructor. Intentionally disabled for this class.
+          */
+        ConvolutionalDecoder(const ConvolutionalDecoder &other) = delete;
+        
+        /**
+          * @brief Move constructor.
+          */
+        ConvolutionalDecoder(const ConvolutionalDecoder &&other) { }
+        
+        /**
+          * @brief Copy assignment operator. Intentionally disabled for this class.
+          */
+        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &other) = delete;
+        
+        /**
+          * @brief Move assignment operator.
+          */
+        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &&other) { };
+        
+        /**
+          * @brief Returns the reciproc of the code rate.
+          */
+        constexpr inline uint32_t reciprocCodeRate() const {
+            return outputCount_;
+        }
         
         /**
          * @brief Decodes a given block.
@@ -217,16 +247,16 @@ namespace fecmagic {
             
             uint32_t nextWindowPos = 0;
             uint32_t afterNextWindowPos = 0;
-            bool firstBitIgnored = false;
+            uint32_t currentStepCount = 0;
             
             while (inAddr < inputSize) {
                 TShiftReg receivedBits = 0;
                 
                 // Get necessary number of input bits
                 for (uint32_t o = 0; o < outputCount_; o++) {
+                    // Read current input bit
                     receivedBits <<= 1;
                     receivedBits |= ((input[inAddr] >> inBitPos) & 1);
-                    // NOTE: this only works if (sizeof(TShiftReg) * 8) % outputCount_ == 0
                     
                     // Advance input bit position
                     if (inBitPos == 0) {
@@ -264,35 +294,29 @@ namespace fecmagic {
                     calculateErrorMetricForInput(currentState, window[nextWindowPos], i, receivedBits, 1);
                 }
                 
-                // Get output bits, if any, by tracing back to the edge of the window
-                const State *stateWithOutput = window[nextWindowPos].lowestErrorState;
-                for (uint32_t i = 0; i < (Depth - 1); i++) {
-                    if (stateWithOutput == nullptr) {
-                        break;
-                    }
-                    stateWithOutput = stateWithOutput->previous;
-                }
                 
-                if (stateWithOutput != nullptr) {
-                    if (firstBitIgnored) {
-                        // Get output bit and put it to its correct place
-                        uint8_t pib = stateWithOutput->presumedInputBit;
-                        assert((pib & 1) == pib);
-                        
-                        DEBUG_PRINT("<--- pib_out=" << ((uint32_t)pib) << " state=" << BinaryPrint<uint8_t>(stateWithOutput->state));
-                        output[outAddr] |= (pib << outBitPos);
-                        
-                        // Advance output bit position
-                        if (outBitPos == 0) {
-                            outAddr++;
-                            outBitPos = 7;
-                        }
-                        else {
-                            outBitPos--;
-                        }
+                if (currentStepCount > (Depth - 2)) {
+                    // Get output bits, if any, by tracing back
+                    const State *stateWithOutput = window[nextWindowPos].lowestErrorState;
+                    for (uint32_t i = 0; i < (Depth - 1); i++) {
+                        stateWithOutput = stateWithOutput->previous;
                     }
                     
-                    firstBitIgnored = true;
+                    // Get output bit and put it to its correct place
+                    uint8_t pib = stateWithOutput->presumedInputBit;
+                    assert((pib & 1) == pib);
+                    
+                    DEBUG_PRINT("<--- pib_out=" << ((uint32_t)pib) << " state=" << BinaryPrint<uint8_t>(stateWithOutput->state));
+                    output[outAddr] |= (pib << outBitPos);
+                    
+                    // Advance output bit position
+                    if (outBitPos == 0) {
+                        outAddr++;
+                        outBitPos = 7;
+                    }
+                    else {
+                        outBitPos--;
+                    }
                 }
                 
                 // Get the window position after the next one
@@ -308,6 +332,9 @@ namespace fecmagic {
                 
                 // Advance window position
                 windowPos = nextWindowPos;
+                
+                // Increment step counter
+                currentStepCount ++;
             }
             
             // We ran out of inputs.
@@ -316,19 +343,28 @@ namespace fecmagic {
             const State *stateWithOutput = window[windowPos].lowestErrorState;
             
             // Go through the state with lowest error metric backwards, this will go through them in reversed order
-            for (uint32_t i = Depth - 1; i > 0; i--) {
+            uint32_t tracebackDepth;
+            if (currentStepCount > (Depth - 1)) {
+                tracebackDepth = Depth - 1;
+            }
+            else {
+                tracebackDepth = currentStepCount;
+            }
+            
+            uint32_t trackbackIndex = tracebackDepth;
+            for (; trackbackIndex > 0; trackbackIndex--) {
                 DEBUG_PRINT("at the end, got out bit: " << (uint32_t)stateWithOutput->presumedInputBit << " state=" << (uint32_t)stateWithOutput->state);
                 
                 // Useful for debugging when decoding without bit errors
                 //assert(stateWithOutput->accumulatedErrorMetric == 0);
                 
-                remainingOutputBits[i - 1] = stateWithOutput->presumedInputBit;
+                remainingOutputBits[trackbackIndex - 1] = stateWithOutput->presumedInputBit;
                 stateWithOutput = stateWithOutput->previous;
             }
             
             // Put the remaining bits to the output in the correct order
-            for (uint32_t i = 0; i < (Depth - 1); i++) {
-                uint8_t pib = remainingOutputBits[i];
+            for (; trackbackIndex < tracebackDepth; trackbackIndex++) {
+                uint8_t pib = remainingOutputBits[trackbackIndex];
                 assert((pib & 1) == pib);
                 
                 DEBUG_PRINT("<--- pib_out=" << ((uint32_t)pib));
@@ -350,6 +386,10 @@ namespace fecmagic {
     };
 
 }
+
+#ifdef DEBUG_PRINT
+#   undef DEBUG_PRINT
+#endif
 
 #endif // CONVOLUTIONAL_DECODER
 
