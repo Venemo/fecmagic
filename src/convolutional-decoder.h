@@ -190,12 +190,39 @@ namespace fecmagic {
                 }
             }
         }
+        
+        // Current output
+        uint8_t *output;
+        
+        // All the state that we need to keep in memory at once.
+        Step window[Depth];
+        
+        // Current position within the window, indicates which
+        // data structure is used to store the current state.
+        uint32_t windowPos;
+        
+        // Number of steps already taken.
+        uint32_t currentStepCount;
+        
+        // Output position
+        size_t outAddr;
+        uint32_t outBitPos;
     
     public:
+        
+        /**
+         * @brief Returns the reciproc of the code rate.
+         */
+        constexpr static inline uint32_t reciprocCodeRate() {
+            return outputCount_;
+        }
+        
         /**
          * @brief Default constructor.
          */
-        constexpr inline explicit ConvolutionalDecoder() { }
+        constexpr inline explicit ConvolutionalDecoder(void *output = nullptr) {
+            this->reset(output);
+        }
         
         /**
          * @brief Copy constructor. Intentionally disabled for this class.
@@ -205,7 +232,9 @@ namespace fecmagic {
         /**
          * @brief Move constructor.
          */
-        ConvolutionalDecoder(const ConvolutionalDecoder &&other) { }
+        ConvolutionalDecoder(const ConvolutionalDecoder &&other) {
+            this->operator=(other);
+        }
         
         /**
          * @brief Copy assignment operator. Intentionally disabled for this class.
@@ -215,13 +244,37 @@ namespace fecmagic {
         /**
          * @brief Move assignment operator.
          */
-        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &&other) { };
+        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &&other) {
+            this->output = std::move(other.output);
+            this->window = std::move(other.window);
+            this->windowPos = std::move(other.windowPos);
+            this->currentStepCount = std::move(other.currentStepCount);
+            this->outAddr = std::move(other.outAddr);
+            this->outBitPos = std::move(other.outBitPos);
+        };
         
         /**
-         * @brief Returns the reciproc of the code rate.
+         * @bried Resets the convolutional decoder.
          */
-        constexpr static inline uint32_t reciprocCodeRate() {
-            return outputCount_;
+        void reset(void *output) {
+            // Set output
+            this->output = reinterpret_cast<uint8_t*>(output);
+            
+            // Reset the state space
+            for (uint32_t i = 0; i < Depth; i++) {
+                window[i].reset();
+            }
+            
+            // The encoder always starts at the 0 state, so the error metric of that is 0
+            window[0].states[0].accumulatedErrorMetric = 0;
+            window[0].lowestErrorMetric = 0;
+            window[0].lowestErrorState = &(window[windowPos].states[0]);
+            
+            // Start from the beginning
+            windowPos = 0;
+            currentStepCount = 0;
+            outAddr = 0;
+            outBitPos = 7;
         }
         
         /**
@@ -248,9 +301,9 @@ namespace fecmagic {
          * The caller of this method is responsible for making sure that enough memory is
          * allocated to fit the output.
          *
-         * This method is not suitable for streaming.
+         * This method is suitable for streaming.
          */
-        void decodeBlock(const uint8_t *input, size_t inputSize, uint8_t *output) {
+        void decode(const uint8_t *input, size_t inputSize) {
             // Check parameters
             if (inputSize == 0) {
                 return;
@@ -260,29 +313,13 @@ namespace fecmagic {
             
             DEBUG_PRINT("depth=" << (uint32_t)Depth << ", possibleStateCount=" << (uint32_t)Step::possibleStateCount);
         
-            // All the state that we need to keep in memory at once
-            Step window[Depth];
-            
-            uint32_t windowPos = 0;
-            
             // Input position
             size_t inAddr = 0;
             uint32_t inBitPos = 7;
             
-            // Output position
-            size_t outAddr = 0;
-            uint32_t outBitPos = 7;
-            
-            // The encoder always starts at the 0 state, so the error metric of that is 0
-            window[windowPos].states[0].accumulatedErrorMetric = 0;
-            window[windowPos].lowestErrorMetric = 0;
-            window[windowPos].lowestErrorState = &window[windowPos].states[0];
-            
-            uint32_t nextWindowPos = 0;
-            uint32_t afterNextWindowPos = 0;
-            uint32_t currentStepCount = 0;
-            
             while (inAddr < inputSize) {
+                uint32_t nextWindowPos;
+                uint32_t afterNextWindowPos;
                 TShiftReg receivedBits = 0;
                 
                 // Get necessary number of input bits, one by one.
@@ -335,6 +372,7 @@ namespace fecmagic {
                     // Get output bits, if any, by tracing back
                     const State *stateWithOutput = window[nextWindowPos].lowestErrorState;
                     for (uint32_t i = 0; i < (Depth - 1); i++) {
+                        assert(stateWithOutput->previous != nullptr);
                         stateWithOutput = stateWithOutput->previous;
                     }
                     
@@ -372,7 +410,9 @@ namespace fecmagic {
                 // Increment step counter
                 currentStepCount ++;
             }
-            
+        }
+        
+        void flush() {
             // We ran out of inputs.
             // Let's get the remaining output bits, if any, by tracing back
             uint8_t remainingOutputBits[Depth - 1];
@@ -394,6 +434,7 @@ namespace fecmagic {
                 // Useful for debugging when decoding without bit errors
                 //assert(stateWithOutput->accumulatedErrorMetric == 0);
                 
+                assert(stateWithOutput->previous != nullptr);
                 remainingOutputBits[trackbackIndex - 1] = stateWithOutput->presumedInputBit;
                 stateWithOutput = stateWithOutput->previous;
             }
@@ -415,7 +456,6 @@ namespace fecmagic {
                     outBitPos--;
                 }
             }
-            
         }
     
     

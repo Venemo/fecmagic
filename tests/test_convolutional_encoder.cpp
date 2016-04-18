@@ -185,10 +185,11 @@ int main() {
         cout << "nope, k=3, rate=1/2 doesn't work!" << endl;
     }
     
-    ConvolutionalDecoder<15, 3, uint8_t, 7, 5> dec3;
     uint8_t decoded[] = { 0, 0, 0 };
+    ConvolutionalDecoder<15, 3, uint8_t, 7, 5> dec3(decoded);
     
-    dec3.decodeBlock(expectedOutput, 5, decoded);
+    dec3.decode(expectedOutput, 5);
+    dec3.flush();
     
     if (0 == memcmp(decoded, input, 2)) {
         cout << "yup, k=3, rate=1/2 decode works!" << endl;

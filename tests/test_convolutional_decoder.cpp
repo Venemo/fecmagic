@@ -70,7 +70,9 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     cout << endl;
 #endif
     
-    dec.decodeBlock(encOutput, encodedSize, decOutput);
+    dec.reset(decOutput);
+    dec.decode(encOutput, encodedSize);
+    dec.flush();
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < decodedSize; i++) {
@@ -131,7 +133,9 @@ bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, ui
     }
     
     // Decode
-    dec.decodeBlock(encOutput, encodedSize, decOutput);
+    dec.reset(decOutput);
+    dec.decode(encOutput, encodedSize);
+    dec.flush();
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < decodedSize; i++) {
