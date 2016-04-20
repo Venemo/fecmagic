@@ -257,7 +257,7 @@ namespace fecmagic {
         };
         
         /**
-         * @bried Resets the convolutional decoder.
+         * @bried Resets the convolutional decoder and sets the given output.
          */
         void reset(void *output) {
             // Set output
@@ -307,12 +307,14 @@ namespace fecmagic {
          *
          * This method is suitable for streaming.
          */
-        void decode(const uint8_t *input, size_t inputSize) {
+        void decode(const void *input, size_t inputSize) {
             // Check parameters
             if (inputSize == 0) {
                 return;
             }
-            assert(input != nullptr);
+            
+            const uint8_t *inputBytes = reinterpret_cast<const uint8_t*>(input);
+            assert(inputBytes != nullptr);
             assert(output != nullptr);
             
             DEBUG_PRINT("depth=" << (uint32_t)Depth << ", possibleStateCount=" << (uint32_t)Step::possibleStateCount);
@@ -333,7 +335,7 @@ namespace fecmagic {
                 for (uint32_t o = 0; o < outputCount_ && inAddr < inputSize; o++) {
                     // Read current input bit
                     receivedBits <<= 1;
-                    receivedBits |= ((input[inAddr] >> inBitPos) & 1);
+                    receivedBits |= ((inputBytes[inAddr] >> inBitPos) & 1);
                     
                     // Advance input bit position
                     if (inBitPos == 0) {

@@ -125,7 +125,7 @@ bool testStreamingSimple() {
     memset(output1, 0, outputSize);
     
     enc1.reset(output1);
-    enc1.encode(reinterpret_cast<const uint8_t*>(input1), inputSize);
+    enc1.encode(input1, inputSize);
     enc1.flush();
     
     const char *input2_1 = "Hello ";
@@ -136,9 +136,9 @@ bool testStreamingSimple() {
     
     ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc2;
     enc2.reset(output2);
-    enc2.encode(reinterpret_cast<const uint8_t*>(input2_1), strlen(input2_1));
-    enc2.encode(reinterpret_cast<const uint8_t*>(input2_2), strlen(input2_2));
-    enc2.encode(reinterpret_cast<const uint8_t*>(input2_3), strlen(input2_3));
+    enc2.encode(input2_1, strlen(input2_1));
+    enc2.encode(input2_2, strlen(input2_2));
+    enc2.encode(input2_3, strlen(input2_3));
     enc2.flush();
     
     bool success = (0 == memcmp(output1, output2, outputSize));

@@ -168,14 +168,15 @@ namespace fecmagic {
          *
          * This method is suitable for streaming.
          */
-        void encode(const uint8_t *input, size_t inputSize) {
+        void encode(const void *input, size_t inputSize) {
             DEBUG_PRINT("encode()ing");
             
             if (inputSize == 0) {
                 return;
             }
             
-            assert(input != nullptr);
+            const uint8_t *inputBytes = reinterpret_cast<const uint8_t*>(input);
+            assert(inputBytes != nullptr);
             assert(output != nullptr);
             
             // Input position
@@ -190,7 +191,7 @@ namespace fecmagic {
                 // If the input still has bytes, use them, otherwise just flush the register
                 if (inAddr < inputSize) {
                     // Shift the next input bit into the register
-                    shiftReg |= (((input[inAddr] >> inBitPos) & 1) << (ConstraintLength - 1));
+                    shiftReg |= (((inputBytes[inAddr] >> inBitPos) & 1) << (ConstraintLength - 1));
                 }
                 
                 // Produce output
