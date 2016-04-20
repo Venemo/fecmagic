@@ -30,6 +30,15 @@
 
 #include "fecmagic-global.h"
 
+//#define CONVOLUTIONAL_ENCODER_DEBUG
+#ifdef CONVOLUTIONAL_ENCODER_DEBUG
+#   include <iostream>
+#   include "binaryprint.h"
+#   define DEBUG_PRINT(x) (::std::cout << "[ConvolutionalEncoder] " << x << std::endl);
+#else
+#   define DEBUG_PRINT(x)
+#endif
+
 namespace fecmagic {
 
     /**
@@ -73,6 +82,7 @@ namespace fecmagic {
         inline void produceOutput() {
             // Compute outputs from the current state of the encoder
             for (uint32_t o = 0; o < outputCount_; o++) {
+                DEBUG_PRINT(outAddr << "/" << outBitPos << " shiftReg=" << BinaryPrint<TShiftReg>(shiftReg));
                 // Compute output and put it to its correct place
                 output[outAddr] |= (::fecmagic::computeParity(polynomials_[o] & shiftReg) << outBitPos);
                 
@@ -141,7 +151,8 @@ namespace fecmagic {
          */
         static inline uint32_t calculateOutputSize(uint32_t inputSize) {
             // Number of bytes occupied by the constraint length
-            constexpr uint32_t constraintLengthBytes = (ConstraintLength / 8) + (((ConstraintLength % 8) == 0) ? 0 : 1);
+            constexpr uint32_t constraintLengthBits = ConstraintLength * outputCount_;
+            constexpr uint32_t constraintLengthBytes = (constraintLengthBits / 8) + (((constraintLengthBits % 8) == 0) ? 0 : 1);
             // Total output size
             uint32_t outputSize = (inputSize * outputCount_) + constraintLengthBytes;
             
@@ -158,6 +169,8 @@ namespace fecmagic {
          * This method is suitable for streaming.
          */
         void encode(const uint8_t *input, size_t inputSize) {
+            DEBUG_PRINT("encode()ing");
+            
             if (inputSize == 0) {
                 return;
             }
@@ -198,6 +211,8 @@ namespace fecmagic {
          * @brief Flushes the encoder, outputting the remaining bits until the shift register is empty.
          */
         void flush() {
+            DEBUG_PRINT("flush()ing");
+            
             while (shiftReg != 0) {
                 // Shift the register right
                 shiftReg >>= 1;
@@ -208,7 +223,17 @@ namespace fecmagic {
         }
         
     };
+    
+    // Definition for the static member ConvolutionalEncoder::polynomials_
+    template<uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    constexpr TShiftReg ConvolutionalEncoder<ConstraintLength, TShiftReg, Polynomials...>::polynomials_[];
 
 }
+
+#ifdef CONVOLUTIONAL_ENCODER_DEBUG
+#   ifdef DEBUG_PRINT
+#       undef DEBUG_PRINT
+#   endif
+#endif
 
 #endif // CONVOLUTIONAL_ENCODER

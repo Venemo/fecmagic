@@ -290,7 +290,8 @@ namespace fecmagic {
          */
         static inline uint32_t calculateOutputSize(uint32_t inputSize) {
             // Number of bytes occupied by the constraint length
-            constexpr uint32_t constraintLengthBytes = (ConstraintLength / 8) + (((ConstraintLength % 8) == 0) ? 0 : 1);
+            constexpr uint32_t constraintLengthBits = ConstraintLength * outputCount_;
+            constexpr uint32_t constraintLengthBytes = (constraintLengthBits / 8) + (((constraintLengthBits % 8) == 0) ? 0 : 1);
             // Total output size
             uint32_t outputSize = (inputSize - constraintLengthBytes) / outputCount_ + constraintLengthBytes;
             
@@ -463,11 +464,17 @@ namespace fecmagic {
     
     
     };
+    
+    // Definition for the static member ConvolutionalDecoder::polynomials_
+    template<uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    constexpr TShiftReg ConvolutionalDecoder<Depth, ConstraintLength, TShiftReg, Polynomials...>::polynomials_[];
 
 }
 
-#ifdef DEBUG_PRINT
-#   undef DEBUG_PRINT
+#ifdef CONVOLUTIONAL_DECODER_DEBUG
+#   ifdef DEBUG_PRINT
+#       undef DEBUG_PRINT
+#   endif
 #endif
 
 #endif // CONVOLUTIONAL_DECODER
