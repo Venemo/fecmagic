@@ -263,12 +263,13 @@ namespace fecmagic {
             // Set output
             this->output = reinterpret_cast<uint8_t*>(output);
             
-            // Reset the state space
-            for (uint32_t i = 0; i < Depth; i++) {
-                window[i].reset();
-            }
+            // Reset the state space.
+            // Only the first step needs to be reset here, the
+            // rest of them will be overwritten anyway in decode().
+            window[0].reset();
             
-            // The encoder always starts at the 0 state, so the error metric of that is 0
+            // The encoder always starts at the 0 state, so the
+            // error metric corresponding to that state is 0
             window[0].states[0].accumulatedErrorMetric = 0;
             window[0].lowestErrorMetric = 0;
             window[0].lowestErrorState = &(window[windowPos].states[0]);
