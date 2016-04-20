@@ -30,45 +30,18 @@
 // old project. The results produced by the new algorithm are simply compared to the
 // results produced by the new one.
 
-#include <iostream>
-#include <cstdlib>
-#include <cstring>
+#include "helper.h"
 #include "../src/binaryprint.h"
 #include "../src/convolutional-encoder.h"
 #include "../src/convolutional-decoder.h"
+
+#include <iostream>
 
 using namespace std;
 using namespace fecmagic;
 
 constexpr uint8_t poly1 = 0x6d;
 constexpr uint8_t poly2 = 0x4f;
-
-// Creates an array that contains zeros and ones from a byte array
-void bytearray2zeroone(unsigned bytelength, const unsigned char in[], unsigned char out[]) {
-    unsigned i, j;
-    unsigned char cmp;
-    for (i = 0; i < bytelength; i++) {
-        cmp = 128;
-        for (j = 0; j < 8; j++) {
-            out[i * 8 + j] = ((cmp & in[i]) != 0);
-            cmp /= 2;
-        }
-    }
-}
-
-// Creates a byte array from an array that contains zeros and ones
-void zeroone2bytearray(unsigned bytelength, const unsigned char in[], unsigned char out[]) {
-    unsigned i, j;
-    unsigned char cmp;
-    for (i = 0; i < bytelength; i++) {
-        out[i] = 0;
-        cmp = 128;
-        for (j = 0; j < 8; j++) {
-            out[i] += in[i * 8 + j] * cmp;
-            cmp /= 2;
-        }
-    }
-}
 
 void old_encode(unsigned char in[], unsigned char out[], size_t inputsize, size_t encodedlength) {
     size_t i;
@@ -103,25 +76,7 @@ void encodeWithOldAlgorithm(uint8_t *input, size_t inputSize, uint8_t *output) {
     delete [] encoded_bits;
 }
 
-template<typename T>
-constexpr T reverseBits(T v) {
-    // Check template parameter
-    static_assert(std::is_integral<T>::value == true, "You must use this function with integral types.");
-    
-    // Thanks to Sean Eron Anderson for making this algorithm,
-    // see http://graphics.stanford.edu/~seander/bithacks.html#BitReverseObvious
-    T r = v;
-    uint32_t s = sizeof(v) * 8 - 1;
-    
-    for (v >>= 1; v; v >>= 1) {
-        r <<= 1;
-        r |= v & 1;
-        s--;
-    }
-    r <<= s;
-    
-    return r;
-}
+
 
 bool testConvolutionalCode(size_t inputSize, const uint8_t *inputData) {
     // Create input
@@ -159,7 +114,129 @@ bool testConvolutionalCode(size_t inputSize, const uint8_t *inputData) {
     return success;
 }
 
+bool testStreamingSimple() {
+    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc1;
+    
+    const char *input1 = "Hello world, are we cool yet?";
+    uint32_t inputSize = strlen(input1);
+    uint32_t outputSize = enc1.calculateOutputSize(inputSize);
+    
+    uint8_t *output1 = new uint8_t[outputSize];
+    memset(output1, 0, outputSize);
+    
+    enc1.reset(output1);
+    enc1.encode(reinterpret_cast<const uint8_t*>(input1), inputSize);
+    enc1.flush();
+    
+    const char *input2_1 = "Hello ";
+    const char *input2_2 = "world, are";
+    const char *input2_3 = " we cool yet?";
+    uint8_t *output2 = new uint8_t[outputSize];
+    memset(output2, 0, outputSize);
+    
+    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc2;
+    enc2.reset(output2);
+    enc2.encode(reinterpret_cast<const uint8_t*>(input2_1), strlen(input2_1));
+    enc2.encode(reinterpret_cast<const uint8_t*>(input2_2), strlen(input2_2));
+    enc2.encode(reinterpret_cast<const uint8_t*>(input2_3), strlen(input2_3));
+    enc2.flush();
+    
+    bool success = (0 == memcmp(output1, output2, outputSize));
+    
+    delete [] output1;
+    delete [] output2;
+    
+    return success;
+}
+
+bool testStreaming() {
+    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc1;
+    
+    constexpr uint32_t inputSize = 40;
+    uint32_t outputSize = enc1.calculateOutputSize(inputSize);
+    
+    // Create input1
+    uint8_t *input = new uint8_t[inputSize];
+    for (uint32_t i = 0; i < inputSize; i++) {
+        input[i] = rand() % 256;
+    }
+    
+//    cout << "input1:" << endl;
+//    for (uint32_t i = 0; i < inputSize; i++) {
+//        cout << BinaryPrint<uint8_t>(input[i]) << " ";
+//    }
+//    cout << endl;
+    
+    // Create input2
+    constexpr uint32_t sd = 15;
+    uint8_t *input2_1 = new uint8_t[inputSize - sd];
+    uint8_t *input2_2 = new uint8_t[sd];
+    memcpy(input2_1, input, inputSize - sd);
+    memcpy(input2_2, input + inputSize - sd, sd);
+    
+//    cout << "input2:" << endl;
+//    for (uint32_t i = 0; i < (inputSize - sd); i++) {
+//        cout << BinaryPrint<uint8_t>(input2_1[i]) << " ";
+//    }
+//    for (uint32_t i = 0; i < (sd); i++) {
+//        cout << BinaryPrint<uint8_t>(input2_2[i]) << " ";
+//    }
+//    cout << endl;
+    
+    // Create output1
+    uint8_t *output = new uint8_t[outputSize];
+    memset(output, 0, outputSize);
+    
+    enc1.reset(output);
+    enc1.encode(input, inputSize);
+    enc1.flush();
+    
+//    cout << "output1:" << endl;
+//    for (uint32_t i = 0; i < outputSize; i++) {
+//        cout << BinaryPrint<uint8_t>(output[i]) << " ";
+//    }
+//    cout << endl;
+    
+    // Create output2
+    uint8_t *output2 = new uint8_t[outputSize];
+    memset(output2, 0, outputSize);
+    
+    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc2;
+    enc2.reset(output2);
+    enc2.encode(input2_1, inputSize - sd);
+    enc2.encode(input2_2, sd);
+    enc2.flush();
+    
+    
+//    cout << "output2:" << endl;
+//    for (uint32_t i = 0; i < outputSize; i++) {
+//        cout << BinaryPrint<uint8_t>(output2[i]) << " ";
+//    }
+//    cout << endl;
+
+    uint8_t *output3 = new uint8_t[outputSize];
+    memset(output3, 0, outputSize);
+    enc1.reset(output3);
+    enc1.encode(input2_1, inputSize - sd);
+    enc1.encode(input2_2, sd);
+    enc1.flush();
+    
+    bool success = (0 == memcmp(output, output2, outputSize));
+    success == success && (0 == memcmp(output, output3, outputSize));
+    
+    delete [] input;
+    delete [] input2_1;
+    delete [] input2_2;
+    delete [] output;
+    delete [] output2;
+    delete [] output3;
+    
+    return success;
+}
+
 int main() {
+    srand(time(0));
+    
     cout << "poly1 = " << BinaryPrint<uint8_t>(poly1) << endl;
     cout << "poly2 = " << BinaryPrint<uint8_t>(poly2) << endl;
     
@@ -202,6 +279,13 @@ int main() {
     else {
         cout << "nope, k=3, rate=1/2 decode doesn't work!" << endl;
     }
+    
+    cout << "Simple streaming: " << testStreamingSimple() << endl;
+    
+    for (uint32_t i = 0; i < 100; i++) {
+        assert(testStreaming());
+    }
+    cout << "Random streaming: ok" << endl;
     
     return 0;
 }
