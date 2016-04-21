@@ -387,7 +387,12 @@ namespace fecmagic {
                     uint8_t pib = stateWithOutput->presumedInputBit;
                     assert((pib & 1) == pib);
                     
-                    DEBUG_PRINT("<--- pib_out=" << ((uint32_t)pib) << " state=" << BinaryPrint<uint8_t>(stateWithOutput->state));
+                    if (outBitPos == 7) {
+                        // Set current output byte to zero, so that Valgrind and other
+                        // memory check tools don't complain about it.
+                        output[outAddr] = 0;
+                    }
+                    DEBUG_PRINT("<--- OUTADDR=" << outAddr << " pib_out=" << ((uint32_t)pib) << " state=" << BinaryPrint<uint8_t>(stateWithOutput->state));
                     output[outAddr] |= (pib << outBitPos);
                     
                     // Advance output bit position
@@ -451,6 +456,12 @@ namespace fecmagic {
                 uint8_t pib = remainingOutputBits[trackbackIndex];
                 assert((pib & 1) == pib);
                 
+                if (outBitPos == 7) {
+                    // Set current output byte to zero, so that Valgrind and other
+                    // memory check tools don't complain about it.
+                    output[outAddr] = 0;
+                }
+                
                 DEBUG_PRINT("<--- pib_out=" << ((uint32_t)pib));
                 output[outAddr] |= (pib << outBitPos);
                 
@@ -474,10 +485,8 @@ namespace fecmagic {
 
 }
 
-#ifdef CONVOLUTIONAL_DECODER_DEBUG
-#   ifdef DEBUG_PRINT
-#       undef DEBUG_PRINT
-#   endif
+#ifdef DEBUG_PRINT
+#   undef DEBUG_PRINT
 #endif
 
 #endif // CONVOLUTIONAL_DECODER

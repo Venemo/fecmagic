@@ -51,8 +51,8 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     uint8_t *encOutput = new uint8_t[encodedSize];
     uint8_t *decOutput = new uint8_t[decodedSize];
     memcpy(encInput, data, dataSize);
-    memset(encOutput, 0, encodedSize);
-    memset(decOutput, 0, decodedSize);
+    
+    cout << "datasize=" << dataSize << " encodedSize=" << encodedSize << " decodedSize=" << decodedSize << endl;
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < dataSize; i++) {
@@ -67,7 +67,7 @@ bool testEncodeAndDecode(TEnc &enc, TDec &dec, const char *data) {
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < encodedSize; i++) {
-        cout << BinaryPrint<uint8_t>(encOutput[i]) << " ";
+        cout << i << " " << encOutput[i] << endl; // BinaryPrint<uint8_t>(encOutput[i]) << " " << endl;
     }
     cout << endl;
 #endif
@@ -101,8 +101,6 @@ bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, ui
     uint8_t *encOutput = new uint8_t[encodedSize];
     uint8_t *decOutput = new uint8_t[decodedSize];
     memcpy(encInput, data, dataSize);
-    memset(encOutput, 0, encodedSize);
-    memset(decOutput, 0, decodedSize);
     
 #ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
     for (uint32_t i = 0; i < dataSize; i++) {
@@ -163,6 +161,7 @@ int main() {
     ConvolutionalDecoder<15, 3, uint8_t, 7, 3, 5> dec2;
     ConvolutionalDecoder<2, 3, uint8_t, 7, 3, 5> dec2_2;
     assert(testEncodeAndDecode(enc2, dec2, "Hello!"));
+    
     assert(testEncodeAndDecode(enc2, dec2_2, "Hello!"));
     cout << "OK" << endl;
     

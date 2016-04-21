@@ -82,6 +82,11 @@ namespace fecmagic {
         inline void produceOutput() {
             // Compute outputs from the current state of the encoder
             for (uint32_t o = 0; o < outputCount_; o++) {
+                if (outBitPos == 7) {
+                    DEBUG_PRINT("set " << outAddr << " byte to 0");
+                    output[outAddr] = 0;
+                }
+                
                 DEBUG_PRINT(outAddr << "/" << outBitPos << " shiftReg=" << BinaryPrint<TShiftReg>(shiftReg));
                 // Compute output and put it to its correct place
                 output[outAddr] |= (::fecmagic::computeParity(polynomials_[o] & shiftReg) << outBitPos);
@@ -214,7 +219,7 @@ namespace fecmagic {
         void flush() {
             DEBUG_PRINT("flush()ing");
             
-            while (shiftReg != 0) {
+            for (uint32_t i = 0; i < ConstraintLength; i++) {
                 // Shift the register right
                 shiftReg >>= 1;
                 
@@ -231,10 +236,8 @@ namespace fecmagic {
 
 }
 
-#ifdef CONVOLUTIONAL_ENCODER_DEBUG
-#   ifdef DEBUG_PRINT
-#       undef DEBUG_PRINT
-#   endif
+#ifdef DEBUG_PRINT
+#   undef DEBUG_PRINT
 #endif
 
 #endif // CONVOLUTIONAL_ENCODER

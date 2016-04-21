@@ -79,21 +79,20 @@ void encodeWithOldAlgorithm(uint8_t *input, size_t inputSize, uint8_t *output) {
 
 
 bool testConvolutionalCode(size_t inputSize, const uint8_t *inputData) {
+    // NOTE: the ConvolutionalEncoder class shifts in bits from the other direction,
+    //       so we need to reverse the polynomials as well, to get the same output.
+    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> encoder;
+    
     // Create input
     uint8_t *input = new uint8_t[inputSize];
     memset(input, 0, inputSize);
     memcpy(input, inputData, inputSize);
     
     // Create output
-    size_t outputSize = 2 * inputSize + 1;
+    size_t outputSize = encoder.calculateOutputSize(inputSize);
     uint8_t *output1 = new uint8_t[outputSize];
-    memset(output1, 0, outputSize);
     
     // Encode output using the new algorithm
-    // NOTE: the ConvolutionalEncoder class shifts in bits from the other direction,
-    //       so we need to reverse the polynomials as well, to get the same output.
-    ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> encoder;
-    
     encoder.reset(output1);
     encoder.encode(input, inputSize);
     encoder.flush();
@@ -122,7 +121,6 @@ bool testStreamingSimple() {
     uint32_t outputSize = enc1.calculateOutputSize(inputSize);
     
     uint8_t *output1 = new uint8_t[outputSize];
-    memset(output1, 0, outputSize);
     
     enc1.reset(output1);
     enc1.encode(input1, inputSize);
@@ -132,7 +130,6 @@ bool testStreamingSimple() {
     const char *input2_2 = "world, are";
     const char *input2_3 = " we cool yet?";
     uint8_t *output2 = new uint8_t[outputSize];
-    memset(output2, 0, outputSize);
     
     ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc2;
     enc2.reset(output2);
@@ -185,7 +182,6 @@ bool testStreaming() {
     
     // Create output1
     uint8_t *output = new uint8_t[outputSize];
-    memset(output, 0, outputSize);
     
     enc1.reset(output);
     enc1.encode(input, inputSize);
@@ -199,7 +195,6 @@ bool testStreaming() {
     
     // Create output2
     uint8_t *output2 = new uint8_t[outputSize];
-    memset(output2, 0, outputSize);
     
     ConvolutionalEncoder<7, uint8_t, (reverseBits(poly1) >> 1), (reverseBits(poly2) >> 1)> enc2;
     enc2.reset(output2);
@@ -215,7 +210,6 @@ bool testStreaming() {
 //    cout << endl;
 
     uint8_t *output3 = new uint8_t[outputSize];
-    memset(output3, 0, outputSize);
     enc1.reset(output3);
     enc1.encode(input2_1, inputSize - sd);
     enc1.encode(input2_2, sd);
