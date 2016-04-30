@@ -29,6 +29,7 @@
 #include <cassert>
 
 #include "fecmagic-global.h"
+#include "sequence.h"
 
 //#define CONVOLUTIONAL_ENCODER_DEBUG
 #ifdef CONVOLUTIONAL_ENCODER_DEBUG
@@ -54,13 +55,13 @@ namespace fecmagic {
      *   of the number of polynomials.
      *
      */
-    template<uint32_t ConstraintLength, typename TShiftReg = std::uint32_t, TShiftReg ...Polynomials>
-    class ConvolutionalEncoder final {
+    template<typename TPuncturingMatrix, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    class PuncturedConvolutionalEncoder final {
         // Check template parameters using static asserts
         static_assert((sizeof(TShiftReg) * 8) >= ConstraintLength, "The shift register must be able to hold the constraint length of the code.");
         static_assert(ConstraintLength >= 2, "The ConstraintLength template parameter must be at least two.");
         static_assert(sizeof...(Polynomials) >= 2, "There must be at least two polynomials.");
-    
+        
     private:
         
         // Number of outputs of the convolutional code (each polynomial corresponds to an output)
@@ -68,6 +69,9 @@ namespace fecmagic {
         
         // Unpack variadic template argument, to allow access to each polynomial
         constexpr static TShiftReg polynomials_[sizeof...(Polynomials)] = { Polynomials... };
+        
+        // Instantiate puncturing matrix
+        TPuncturingMatrix puncturingMatrix;
         
         // Output
         uint8_t *output;
@@ -82,6 +86,12 @@ namespace fecmagic {
         inline void produceOutput() {
             // Compute outputs from the current state of the encoder
             for (uint32_t o = 0; o < outputCount_; o++) {
+                // Don't output when the next item in the puncturing matrix is zero
+                if (0 == puncturingMatrix.next()) {
+                    DEBUG_PRINT("punctured bit");
+                    continue;
+                }
+                
                 if (outBitPos == 7) {
                     DEBUG_PRINT("set " << outAddr << " byte to 0");
                     output[outAddr] = 0;
@@ -107,31 +117,31 @@ namespace fecmagic {
         /**
          * @brief Creates a convolutional encoder
          */
-        explicit ConvolutionalEncoder(void *output = nullptr) {
+        explicit PuncturedConvolutionalEncoder(void *output = nullptr) {
             this->reset(output);
         }
         
         /**
          * @brief Copy constructor. Intentionally disabled for this class.
          */
-        ConvolutionalEncoder(const ConvolutionalEncoder &other) = delete;
+        PuncturedConvolutionalEncoder(const PuncturedConvolutionalEncoder &other) = delete;
         
         /**
          * @brief Move constructor.
          */
-        ConvolutionalEncoder(const ConvolutionalEncoder &&other) {
+        PuncturedConvolutionalEncoder(const PuncturedConvolutionalEncoder &&other) {
             this->operator=(other);
         }
         
         /**
          * @brief Copy assignment operator. Intentionally disabled for this class.
          */
-        ConvolutionalEncoder &operator=(const ConvolutionalEncoder &other) = delete;
+        PuncturedConvolutionalEncoder &operator=(const PuncturedConvolutionalEncoder &other) = delete;
         
         /**
          * @brief Move assignment operator.
          */
-        ConvolutionalEncoder &operator=(const ConvolutionalEncoder &&other) {
+        PuncturedConvolutionalEncoder &operator=(const PuncturedConvolutionalEncoder &&other) {
             this->output = std::move(other.output);
             this->shiftReg = std::move(other.shiftReg);
             this->outAddr = std::move(other.outAddr);
@@ -142,6 +152,8 @@ namespace fecmagic {
          * @brief Resets the convolutional encoder and sets the given output.
          */
         void reset(void *output) {
+            DEBUG_PRINT(::std::endl << "resetting encoder");
+            this->puncturingMatrix.reset();
             this->output = reinterpret_cast<uint8_t*>(output);
             this->shiftReg = 0;
             this->outAddr = 0;
@@ -154,12 +166,25 @@ namespace fecmagic {
          * Output size: give space to encoded bits and
          * after that, allow the encoder to be flushed.
          */
-        static inline uint32_t calculateOutputSize(uint32_t inputSize) {
-            // Number of bytes occupied by the constraint length
-            constexpr uint32_t constraintLengthBits = ConstraintLength * outputCount_;
-            constexpr uint32_t constraintLengthBytes = (constraintLengthBits / 8) + (((constraintLengthBits % 8) == 0) ? 0 : 1);
-            // Total output size
-            uint32_t outputSize = (inputSize * outputCount_) + constraintLengthBytes;
+        static inline size_t calculateOutputSize(size_t inputSize) {
+            // Calculate non-punctured output bits
+            size_t outputBits = ((inputSize * 8) + ConstraintLength) * outputCount_;
+            DEBUG_PRINT("inputsize=" << inputSize << ", constraintlength=" << ConstraintLength << ", non-punctured output bit count: " << outputBits);
+            
+            // Take puncturing into account
+            size_t t = outputBits * TPuncturingMatrix::nonZeroes();
+            size_t puncturedOutputBits = t / TPuncturingMatrix::count;
+            if (0 != (t % TPuncturingMatrix::count)) {
+                puncturedOutputBits += 1;
+            }
+            DEBUG_PRINT("punctured output bit count: " << puncturedOutputBits);
+            
+            // Calculate byte count
+            size_t outputSize = puncturedOutputBits / 8;
+            if (0 != puncturedOutputBits % 8) {
+                outputSize += 1;
+            }
+            DEBUG_PRINT("output byte count: " << outputSize);
             
             return outputSize;
         }
@@ -230,9 +255,12 @@ namespace fecmagic {
         
     };
     
-    // Definition for the static member ConvolutionalEncoder::polynomials_
+    // Definition for the static member PuncturedConvolutionalEncoder::polynomials_
+    template<typename TPuncturingMatrix, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    constexpr TShiftReg PuncturedConvolutionalEncoder<TPuncturingMatrix, ConstraintLength, TShiftReg, Polynomials...>::polynomials_[sizeof...(Polynomials)];
+    
     template<uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
-    constexpr TShiftReg ConvolutionalEncoder<ConstraintLength, TShiftReg, Polynomials...>::polynomials_[];
+    using ConvolutionalEncoder = PuncturedConvolutionalEncoder<Sequence<uint8_t, 1>, ConstraintLength, TShiftReg, Polynomials...>;
 
 }
 

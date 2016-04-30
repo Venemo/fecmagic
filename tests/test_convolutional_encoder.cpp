@@ -228,6 +228,103 @@ bool testStreaming() {
     return success;
 }
 
+bool testSequenceSimple() {
+    Sequence<uint8_t, 1, 1, 0, 1> seq;
+    
+    assert(seq.next() == 1);
+    assert(seq.next() == 1);
+    assert(seq.next() == 0);
+    assert(seq.next() == 1);
+    
+    assert(seq.next() == 1);
+    assert(seq.next() == 1);
+    assert(seq.next() == 0);
+    assert(seq.next() == 1);
+    
+    assert(seq.next() == 1);
+    assert(seq.next() == 1);
+    assert(seq.next() == 0);
+    assert(seq.next() == 1);
+    
+    assert(seq.next() == 1);
+    assert(seq.next() == 1);
+    seq.reset();
+    
+    assert(seq.next() == 1);
+    assert(seq.next() == 1);
+    assert(seq.next() == 0);
+    assert(seq.next() == 1);
+    
+    return true;
+}
+
+bool testPuncturedSimple(const char *input) {
+    // Test if the Sequence class works correctly
+    testSequenceSimple();
+    
+    // Non-punctured
+    ConvolutionalEncoder<3, uint8_t, 7, 5> nonPuncturedEncoder;
+    PuncturedConvolutionalEncoder<Sequence<uint8_t, 1, 1, 0, 1>, 3, uint8_t, 7, 5> puncturedEncoder;
+    
+    // Input size
+    size_t inputSize = strlen(input);
+    
+    // Output
+    size_t outputSize = decltype(nonPuncturedEncoder)::calculateOutputSize(inputSize);
+    size_t puncturedOutputSize = decltype(puncturedEncoder)::calculateOutputSize(inputSize);
+    uint8_t *output = new uint8_t[outputSize];
+    uint8_t *puncturedOutput = new uint8_t[puncturedOutputSize];
+    
+    // Encode input
+    nonPuncturedEncoder.reset(output);
+    nonPuncturedEncoder.encode(input, inputSize);
+    nonPuncturedEncoder.flush();
+    
+    puncturedEncoder.reset(puncturedOutput);
+    puncturedEncoder.encode(input, inputSize);
+    puncturedEncoder.flush();
+    
+    // Examine each output bit
+    uint8_t *outputBits = new uint8_t[outputSize * 8];
+    uint8_t *puncturedOutputBits = new uint8_t[puncturedOutputSize * 8];
+    
+    bytearray2zeroone(outputSize, output, outputBits);
+    bytearray2zeroone(puncturedOutputSize, puncturedOutput, puncturedOutputBits);
+    
+//    cout << "inputSize=" << inputSize << endl;
+//    cout << "outputSize=" << outputSize << endl;
+//    cout << "puncturedOutputSize=" << puncturedOutputSize << endl;
+    
+    Sequence<uint8_t, 1, 1, 0, 1> seq;
+    for (size_t i = 0, j = 0; i < (outputSize * 8) && j < (puncturedOutputSize * 8); i++) {
+        if (0 == seq.next()) {
+            continue;
+        }
+        
+        assert(outputBits[i] == puncturedOutputBits[j]);
+        
+        j++;
+    }
+    
+//    // Print
+//    cout << endl << "Non-punctured:" << endl;
+//    for (size_t i = 0; i < outputSize; i++) {
+//        cout << BinaryPrint<uint8_t>(output[i]) << " ";
+//    }
+//    cout << endl << "Punctured:" << endl;
+//    for (size_t i = 0; i < puncturedOutputSize; i++) {
+//        cout << BinaryPrint<uint8_t>(puncturedOutput[i]) << " ";
+//    }
+//    cout << endl;
+    
+    delete [] output;
+    delete [] puncturedOutput;
+    delete [] outputBits;
+    delete [] puncturedOutputBits;
+    
+    return true;
+}
+
 int main() {
     srand(time(0));
     
@@ -280,6 +377,8 @@ int main() {
         assert(testStreaming());
     }
     cout << "Random streaming: ok" << endl;
+    
+    cout << "Simple punctured encoding: " << testPuncturedSimple("Hello, world!") << endl;
     
     return 0;
 }
