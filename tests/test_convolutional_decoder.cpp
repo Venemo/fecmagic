@@ -155,6 +155,57 @@ bool testEncodeAndDecodeWithBitErrors(TEnc &enc, TDec &dec, const char *data, ui
     return success;
 }
 
+bool testPuncturingSimple(const void *input, size_t inputSize) {
+    
+    // Here, we assume that the punctured encoder works correctly,
+    // because it has its own test in test_convolutional_encoder.cpp,
+    // so we only verify that the decoder can decode the punctured
+    // output of the encoder.
+    
+    // Instantiate encoder and decoder
+    PuncturedConvolutionalEncoder<Sequence<uint8_t, 1, 1, 0, 1>, 7, uint8_t, poly1, poly2> encoder;
+    PuncturedConvolutionalDecoder<Sequence<uint8_t, 1, 1, 0, 1>, 35, 7, uint8_t, poly1, poly2> decoder;
+    
+    // Allocate output
+    const uint8_t *inputBytes = reinterpret_cast<const uint8_t*>(input);
+    size_t encoderOutputSize = decltype(encoder)::calculateOutputSize(inputSize);
+    size_t decoderOutputSize = decltype(decoder)::calculateOutputSize(encoderOutputSize);
+    uint8_t *encoderOutput = new uint8_t[encoderOutputSize];
+    uint8_t *decoderOutput = new uint8_t[decoderOutputSize];
+    
+#ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
+    cout << "inputSize=" << inputSize << endl;
+    cout << "encoderOutputSize=" << encoderOutputSize << endl;
+    cout << "decoderOutputSize=" << decoderOutputSize << endl;
+#endif
+    
+    // Encode
+    encoder.reset(encoderOutput);
+    encoder.encode(inputBytes, inputSize);
+    encoder.flush();
+    
+    // Decode
+    decoder.reset(decoderOutput);
+    decoder.decode(encoderOutput, encoderOutputSize);
+    decoder.flush();
+    
+#ifdef TEST_CONVOLUTIONAL_DECODER_DEBUG
+    cout << "input:" << endl;
+    for (size_t i = 0; i < inputSize; i++) {
+        cout << BinaryPrint<uint8_t>(inputBytes[i]) << " ";
+    }
+    cout << endl;
+    cout << "output:" << endl;
+    for (size_t i = 0; i < decoderOutputSize; i++) {
+        cout << BinaryPrint<uint8_t>(decoderOutput[i]) << " ";
+    }
+    cout << endl;
+#endif
+    
+    return 0 == memcmp(input, decoderOutput, inputSize);
+    
+}
+
 int main() {
     cout << "Testing basic functionality (k=3, rate=1/3)" << endl;
     ConvolutionalEncoder<3, uint8_t, 7, 3, 5> enc2;
@@ -201,6 +252,9 @@ int main() {
         assert(testEncodeAndDecodeWithBitErrors(encoder, decoder, "Hello world! Are we awesome yet?", 3));
     }
     cout << "OK" << endl;
+    
+    cout << "Puncturing / simple" << endl;
+    cout << testPuncturingSimple("Hello, world!", sizeof("Hello, world!")) << endl;
     
     return 0;
 }

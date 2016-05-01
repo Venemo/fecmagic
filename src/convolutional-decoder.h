@@ -57,8 +57,8 @@ namespace fecmagic {
      *   corresponds to an output but, so in other words the code rate is the reciproc
      *   of the number of polynomials.
      */
-    template<uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg = std::uint32_t, TShiftReg ...Polynomials>
-    class ConvolutionalDecoder final {
+    template<typename TPuncturingMatrix, uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    class PuncturedConvolutionalDecoder final {
         
         // Check template parameters using static asserts
         static_assert((sizeof(TShiftReg) * 8) >= ConstraintLength, "The shift register must be able to hold the constraint length of the code.");
@@ -77,11 +77,14 @@ namespace fecmagic {
         // Unpack variadic template argument, to allow access to each polynomial
         constexpr static TShiftReg polynomials_[sizeof...(Polynomials)] = { Polynomials... };
         
+        // Puncturing matrix
+        TPuncturingMatrix puncturingMatrix;
+        
         // Represents a single state that the encoder can be in,
         // used in the decoder for tracing the most likely encoder input.
         class State final {
             
-            friend class ConvolutionalDecoder;
+            friend class PuncturedConvolutionalDecoder;
             
 #ifdef CONVOLUTIONAL_DECODER_DEBUG
             // It is wasteful to store the identifier of the state here,
@@ -114,7 +117,7 @@ namespace fecmagic {
         // Represents a step in the decoding procedure
         class Step final {
             
-            friend class ConvolutionalDecoder;
+            friend class PuncturedConvolutionalDecoder;
             
             // Maximum possible number of states when the current decoder is used.
             constexpr static TShiftReg possibleStateCount = (1 << (ConstraintLength - 1));
@@ -152,7 +155,7 @@ namespace fecmagic {
         }
         
         // Calculates error metric for the given current state assuming the specified presumed input bit.
-        static inline void calculateErrorMetricForInput(const State &currentState, Step &nextStep, TShiftReg currentSt, TShiftReg receivedBits, uint8_t presumedInputBit) {
+        static inline void calculateErrorMetricForInput(const State &currentState, Step &nextStep, TShiftReg currentSt, TShiftReg receivedBits, TShiftReg knownBits, uint8_t presumedInputBit) {
             assert(presumedInputBit == (presumedInputBit & 1));
         
             // Next shift register value for the presumed input bit
@@ -163,7 +166,7 @@ namespace fecmagic {
             TShiftReg nextSrOut = getEncoderOutput(nextSr);
             
             // Hamming distance between the would-be encoder output at this state and the received bits
-            uint8_t hammingDistance = computeHammingDistance(nextSrOut, receivedBits);
+            uint8_t hammingDistance = computeHammingDistance(nextSrOut & knownBits, receivedBits);
             
             // Calculate error metric
             TShiftReg oldMetric = currentState.accumulatedErrorMetric;
@@ -180,12 +183,13 @@ namespace fecmagic {
             DEBUG_PRINT("currstate=" << BinaryPrint<uint8_t>(currentSt) << " nextsr=" << BinaryPrint<uint8_t>(nextSr) << " nextstate=" << BinaryPrint<uint8_t>(nextSt) << " pib=" << (uint32_t)presumedInputBit << " aem=" << (uint32_t)metric << " rbits=" << BinaryPrint<uint8_t>(receivedBits) << " eout=" << BinaryPrint<uint8_t>(nextSrOut) << " hd=" << (uint32_t)hammingDistance);
             if (nextState.accumulatedErrorMetric >= metric) {
                 // Overwrite old error metric of this next state with the newly computed one
-#ifdef CONVOLUTIONAL_DECODER_DEBUG
-                nextState.state = nextSt;
-#endif
                 nextState.accumulatedErrorMetric = metric;
                 nextState.presumedInputBit = presumedInputBit;
                 nextState.previous = &currentState;
+                
+#ifdef CONVOLUTIONAL_DECODER_DEBUG
+                nextState.state = nextSt;
+#endif
                 
                 if (metric < nextStep.lowestErrorMetric) {
                     nextStep.lowestErrorMetric = metric;
@@ -223,31 +227,31 @@ namespace fecmagic {
         /**
          * @brief Default constructor.
          */
-        explicit ConvolutionalDecoder(void *output = nullptr) {
+        explicit PuncturedConvolutionalDecoder(void *output = nullptr) {
             this->reset(output);
         }
         
         /**
          * @brief Copy constructor. Intentionally disabled for this class.
          */
-        ConvolutionalDecoder(const ConvolutionalDecoder &other) = delete;
+        PuncturedConvolutionalDecoder(const PuncturedConvolutionalDecoder &other) = delete;
         
         /**
          * @brief Move constructor.
          */
-        ConvolutionalDecoder(const ConvolutionalDecoder &&other) {
+        PuncturedConvolutionalDecoder(const PuncturedConvolutionalDecoder &&other) {
             this->operator=(other);
         }
         
         /**
          * @brief Copy assignment operator. Intentionally disabled for this class.
          */
-        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &other) = delete;
+        PuncturedConvolutionalDecoder &operator=(const PuncturedConvolutionalDecoder &other) = delete;
         
         /**
          * @brief Move assignment operator.
          */
-        ConvolutionalDecoder &operator=(const ConvolutionalDecoder &&other) {
+        PuncturedConvolutionalDecoder &operator=(const PuncturedConvolutionalDecoder &&other) {
             this->output = std::move(other.output);
             this->window = std::move(other.window);
             this->windowPos = std::move(other.windowPos);
@@ -279,6 +283,9 @@ namespace fecmagic {
             currentStepCount = 0;
             outAddr = 0;
             outBitPos = 7;
+            
+            // Reset the puncturing matrix
+            puncturingMatrix.reset();
         }
         
         /**
@@ -289,12 +296,24 @@ namespace fecmagic {
          * space to fill the decoded result of the flushed bits too. These
          * are likely just going to be zeroes.
          */
-        static inline uint32_t calculateOutputSize(uint32_t inputSize) {
-            // Number of bytes occupied by the constraint length
-            constexpr uint32_t constraintLengthBits = ConstraintLength * outputCount_;
-            constexpr uint32_t constraintLengthBytes = (constraintLengthBits / 8) + (((constraintLengthBits % 8) == 0) ? 0 : 1);
-            // Total output size
-            uint32_t outputSize = (inputSize - constraintLengthBytes) / outputCount_ + constraintLengthBytes;
+        static inline size_t calculateOutputSize(uint32_t inputSize) {
+            
+            size_t puncturedBits = inputSize * 8;
+            size_t t = puncturedBits * TPuncturingMatrix::count;
+            size_t nonPuncturedBits = t / TPuncturingMatrix::nonZeroes();
+            if (0 != (t % TPuncturingMatrix::nonZeroes())) {
+                nonPuncturedBits += 1;
+            }
+            
+            size_t outputBits = nonPuncturedBits / outputCount_;
+            if (0 != (nonPuncturedBits % outputCount_)) {
+                outputBits += 1;
+            }
+            
+            size_t outputSize = outputBits / 8;
+            if (0 != (outputBits % 8)) {
+                outputSize += 1;
+            }
             
             return outputSize;
         }
@@ -327,7 +346,11 @@ namespace fecmagic {
             while (inAddr < inputSize) {
                 uint32_t nextWindowPos;
                 uint32_t afterNextWindowPos;
+                
+                // The actual received input bits
                 TShiftReg receivedBits = 0;
+                // Bit mask, 0=punctured, 1=known bit
+                TShiftReg knownBits = 0;
                 
                 // Get necessary number of input bits, one by one.
                 // NOTE: We need to check inAddr vs. inputSize here again,
@@ -336,6 +359,14 @@ namespace fecmagic {
                 for (uint32_t o = 0; o < outputCount_ && inAddr < inputSize; o++) {
                     // Read current input bit
                     receivedBits <<= 1;
+                    // Shift the known bits
+                    knownBits <<= 1;
+                    
+                    if (0 == puncturingMatrix.next()) {
+                        continue;
+                    }
+                    
+                    knownBits |= 1;
                     receivedBits |= ((inputBytes[inAddr] >> inBitPos) & 1);
                     
                     // Advance input bit position
@@ -370,8 +401,8 @@ namespace fecmagic {
 #endif
                     
                     // Calculate appropriate error metric for possible input bits
-                    calculateErrorMetricForInput(currentState, window[nextWindowPos], i, receivedBits, 0);
-                    calculateErrorMetricForInput(currentState, window[nextWindowPos], i, receivedBits, 1);
+                    calculateErrorMetricForInput(currentState, window[nextWindowPos], i, receivedBits, knownBits, 0);
+                    calculateErrorMetricForInput(currentState, window[nextWindowPos], i, receivedBits, knownBits, 1);
                 }
                 
                 
@@ -479,9 +510,12 @@ namespace fecmagic {
     
     };
     
-    // Definition for the static member ConvolutionalDecoder::polynomials_
+    // Definition for the static member PuncturedConvolutionalDecoder::polynomials_
+    template<typename TPuncturingMatrix, uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
+    constexpr TShiftReg PuncturedConvolutionalDecoder<TPuncturingMatrix, Depth, ConstraintLength, TShiftReg, Polynomials...>::polynomials_[sizeof...(Polynomials)];
+
     template<uint32_t Depth, uint32_t ConstraintLength, typename TShiftReg, TShiftReg ...Polynomials>
-    constexpr TShiftReg ConvolutionalDecoder<Depth, ConstraintLength, TShiftReg, Polynomials...>::polynomials_[];
+    using ConvolutionalDecoder = PuncturedConvolutionalDecoder<Sequence<uint8_t, 1>, Depth, ConstraintLength, TShiftReg, Polynomials...>;
 
 }
 
