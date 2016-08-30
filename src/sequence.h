@@ -25,6 +25,7 @@
 #define FECMAGIC_SEQUENCE_H
 
 #include <cstdint>
+#include <cstddef>
 
 namespace fecmagic {
 

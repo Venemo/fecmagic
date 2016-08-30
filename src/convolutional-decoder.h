@@ -25,8 +25,10 @@
 #define CONVOLUTIONAL_DECODER
 
 #include <cstdint>
-#include <limits>
 #include <cassert>
+#include <cstddef>
+#include <limits>
+#include <utility>
 
 #include "fecmagic-global.h"
 

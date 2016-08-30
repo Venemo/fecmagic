@@ -24,9 +24,11 @@
 #ifndef CONVOLUTIONAL_ENCODER
 #define CONVOLUTIONAL_ENCODER
 
-#include <limits>
 #include <cstdint>
 #include <cassert>
+#include <cstddef>
+#include <limits>
+#include <utility>
 
 #include "fecmagic-global.h"
 #include "sequence.h"
