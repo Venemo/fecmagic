@@ -41,7 +41,7 @@ template <typename T>
 ::std::ostream &operator<<(::std::ostream &os, const ::fecmagic::BinaryPrint<T> &bp);
 #if defined(COMPILE_SSE2_CODE)
 ::std::ostream &operator<<(::std::ostream &os, const ::fecmagic::BinaryPrint<__m128i> &bp);
-#endif
+#endif // defined(COMPILE_SSE2_CODE)
 
 namespace fecmagic {
 
@@ -55,8 +55,10 @@ namespace fecmagic {
         template<typename X>
         friend ::std::ostream &::operator<<(::std::ostream &os, const ::fecmagic::BinaryPrint<X> &bp);
         
+        #if defined(COMPILE_SSE2_CODE)
         // Friend: specialized stream operator
         friend ::std::ostream &::operator<<(::std::ostream &os, const ::fecmagic::BinaryPrint<__m128i> &bp);
+        #endif // defined(COMPILE_SSE2_CODE)
         
         // Wrapped value
         T val;
