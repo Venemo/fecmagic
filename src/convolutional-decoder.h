@@ -208,7 +208,7 @@ namespace fecmagic {
         
         // Current position within the window, indicates which
         // data structure is used to store the current state.
-        uint32_t windowPos;
+        uint32_t windowPos = 0;
         
         // Number of steps already taken.
         uint32_t currentStepCount;

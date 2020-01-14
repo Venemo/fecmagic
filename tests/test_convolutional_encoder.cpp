@@ -216,7 +216,7 @@ bool testStreaming() {
     enc1.flush();
     
     bool success = (0 == memcmp(output, output2, outputSize));
-    success == success && (0 == memcmp(output, output3, outputSize));
+    success = success && (0 == memcmp(output, output3, outputSize));
     
     delete [] input;
     delete [] input2_1;
