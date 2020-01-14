@@ -79,6 +79,30 @@ namespace fecmagic {
         return computePopcount(x ^ y);
     }
     
+    /**
+     * Reverses (or reflects) the bits in a byte.
+     *
+     * Source: "Bit Twiddling Hacks" http://graphics.stanford.edu/~seander/bithacks.html#ReverseByteWith32Bits
+     */
+    inline uint8_t bitreverse_8(uint8_t b)
+    {
+        return (uint8_t) (((b * 0x0802LU & 0x22110LU) | (b * 0x8020LU & 0x88440LU)) * 0x10101LU >> 16);
+    }
+
+    /**
+     * Reverses (or reflects) the bits in a 32-bit number.
+     *
+     * Source: "The Aggregate Magic Algorithms" http://aggregate.org/MAGIC/#Bit%20Reversal
+     */
+    inline uint32_t bitreverse_32(register unsigned int x)
+    {
+        x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
+        x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
+        x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
+        x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
+        return ((x >> 16) | (x << 16));
+    }
+
 }
 
 #endif // FECMAGIC_GLOBAL_H

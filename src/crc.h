@@ -28,10 +28,11 @@
 #include <cstdint>
 #include <cstring>
 
+#include "fecmagic-global.h"
+
 //#define CRC_DEBUG
 #ifdef CRC_DEBUG
 #   include <iostream>
-#   include "binaryprint.h"
 #   define DEBUG_PRINT(x) (::std::cout << "[CRC] " << x << ::std::endl << ::std::flush);
 #else
 #   define DEBUG_PRINT(x)
@@ -39,64 +40,66 @@
 
 namespace fecmagic {
 
-    template<uint32_t poly>
-    uint16_t generateCrc16(const uint8_t *input, uint32_t inputSize) {
-        constexpr uint32_t affectedByteCount = sizeof(decltype(poly));
-        
-        if (inputSize == 0) {
+    template<typename T, T POLY, T INIT, T XOROUT, bool REF_IN, bool REF_OUT>
+    T crc_calc(const uint8_t *input_bytes, size_t input_size)
+    {
+        if (!input_size) {
             return 0;
         }
-        
-        uint32_t inAddr = 0;
-        uint32_t inBitPos = 7;
-        
-        uint8_t affectedBytes[affectedByteCount];
-        memset(affectedBytes, 0, affectedByteCount);
-        for (inAddr = 0; inAddr < affectedByteCount && inAddr < inputSize; inAddr++) {
-            affectedBytes[inAddr] = input[inAddr];
-        }
-        inAddr = 0;
-        
-        while (inAddr < inputSize) {
-            uint8_t inBit = (affectedBytes[0] >> inBitPos) & 1;
-            if (inBit) {
-                DEBUG_PRINT("one: ");
-                for (uint32_t i = 0; i < affectedByteCount; i++) {
-                    uint8_t mask = (uint8_t)(((poly >> (7 - inBitPos)) >> ((affectedByteCount - i - 1) * 8)) & 0xff);
-                    DEBUG_PRINT(BinaryPrint<uint8_t>(affectedBytes[i]) << " ^ " << BinaryPrint<uint8_t>(mask) << " ");
-                    affectedBytes[i] ^= mask;
-                }
-            }
-            else {
-                DEBUG_PRINT("zero: ");
-                for (uint32_t i = 0; i < affectedByteCount; i++) {
-                    DEBUG_PRINT(BinaryPrint<uint8_t>(affectedBytes[i]) << " ^ 0");
-                }
-            }
-            
-            // Advance input bit position
-            if (inBitPos == 0) {
-                inAddr++;
-                inBitPos = 7;
-                
-                DEBUG_PRINT("-----");
-                for (uint32_t i = 1; i < affectedByteCount; i++) {
-                    affectedBytes[i - 1] = affectedBytes[i];
-                }
-                if ((inAddr + affectedByteCount - 1) < inputSize) {
-                    affectedBytes[affectedByteCount - 1] = input[inAddr + affectedByteCount - 1];
-                }
-                else {
-                    affectedBytes[affectedByteCount - 1] = 0;
-                }
-            }
-            else {
-                inBitPos--;
+
+        assert(input_bytes);
+        T out = INIT;
+
+        for (size_t byte_pos = 0; byte_pos < (input_size); ++byte_pos) {
+            uint8_t in_byte = input_bytes[byte_pos];
+            out ^= (REF_IN ? bitreverse_8(in_byte) : in_byte) << (sizeof(T) * 8 - 8);
+
+            for (size_t bit_cnt = 0; bit_cnt < 8; ++bit_cnt) {
+                uint32_t mask = -(out >> (sizeof(T) * 8 - 1));
+                out <<= 1;
+                out ^= (POLY & mask);
             }
         }
-        
-        uint16_t output = ((uint16_t)affectedBytes[0] << 8) | (uint16_t)affectedBytes[1];
-        return output;
+
+        if (REF_OUT) {
+            static_assert(sizeof(T) <= sizeof(uint32_t), "Size of T must be less than or equal to 32-bit");
+            out = bitreverse_32(out) >> (sizeof(uint32_t) * 8 - sizeof(T) * 8);
+        }
+
+        // Flip output bits
+        out ^= XOROUT;
+
+        return out;
+    }
+ 
+    uint16_t crc16_buypass(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint16_t, 0x8005, 0, 0, 0, 0>(input_bytes, input_size);
+    }
+ 
+    uint16_t crc16_arc(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint16_t, 0x8005, 0, 0, 1, 1>(input_bytes, input_size);
+    }
+ 
+    uint16_t crc16_usb(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint16_t, 0x8005, 0xFFFF, 0xFFFF, 1, 1>(input_bytes, input_size);
+    }
+ 
+    uint32_t crc32_iso(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint32_t, 0x04C11DB7, 0xFFFFFFFF, 0xFFFFFFFF, 1, 1>(input_bytes, input_size);
+    }
+ 
+    uint32_t crc32_posix(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint32_t, 0x04C11DB7, 0, 0xFFFFFFFF, 0, 0>(input_bytes, input_size);
+    }
+ 
+    uint32_t crc32_32c(const uint8_t *input_bytes, size_t input_size)
+    {
+        return crc_calc<uint32_t, 0x1EDC6F41, 0xFFFFFFFF, 0xFFFFFFFF, 1, 1>(input_bytes, input_size);
     }
 
 }

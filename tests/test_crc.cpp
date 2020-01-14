@@ -3,6 +3,7 @@
 #include "../src/binaryprint.h"
 #include "helper.h"
 #include <iostream>
+#include <iomanip>
 
 using namespace std;
 using namespace fecmagic;
@@ -29,8 +30,8 @@ void old_crc_gen(unsigned char in[], uint32_t inSize, unsigned char crc_b[]) {
     }
 }
 
-bool testCrc(uint8_t *input, uint32_t inputSize) {
-    uint32_t testbitsize = inputSize * 8 + 2 * 8;
+bool testCrc(const uint8_t *input, size_t inputSize) {
+    size_t testbitsize = inputSize * 8 + 2 * 8;
     uint8_t *testbits = new uint8_t[testbitsize];
     uint8_t *resultbits = new uint8_t[16];
     uint8_t *resultArr = new uint8_t[2];
@@ -44,7 +45,7 @@ bool testCrc(uint8_t *input, uint32_t inputSize) {
     uint16_t result1 = ((uint16_t)resultArr[0] << 8) | resultArr[1];
     
     // New algorithm
-    uint16_t result2 = generateCrc16<0xC0028000>(input, inputSize);
+    uint16_t result2 = crc16_buypass(input, inputSize);
     
 //    cout << BinaryPrint<uint16_t>(result1) << endl;
 //    cout << BinaryPrint<uint16_t>(result2) << endl;
@@ -56,7 +57,22 @@ bool testCrc(uint8_t *input, uint32_t inputSize) {
     return result1 == result2;
 }
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc == 2) {
+        const char *test_str = argv[1];
+        size_t test_len = strlen(test_str);
+        
+        cout << "CRC-16/ARC: " << hex << crc16_arc(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        cout << "CRC-16/BUYPASS: " << hex << crc16_buypass(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        cout << "CRC-16/USB: " << hex << crc16_usb(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        
+        cout << "CRC-32/ISO-HDLC: " << hex << crc32_iso(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        cout << "CRC-32/POSIX: " << hex << crc32_posix(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        cout << "CRC-32/32C: " << hex << crc32_32c(reinterpret_cast<const uint8_t *>(test_str), test_len) << dec << endl;
+        
+        return 0;
+    }
+    
     uint8_t test1[] = { 3, 42, 16 };
     cout << (testCrc(test1, 3) ? "yes" : "no") << endl;
     
