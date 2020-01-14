@@ -26,9 +26,8 @@
 
 // Pre-defined macros for architectures:
 // http://sourceforge.net/p/predef/wiki/Architectures/
-#if !defined(FECMAGIC_NO_SSE2) && (defined(__i386__) || defined(_M_IX86) || defined(__x86_64__) || defined(_M_X64))
+#if defined(COMPILE_SSE2_CODE)
 #    include <emmintrin.h>
-#    define COMPILE_SSE2_CODE
 #    if defined(__GNUC__)
 #        define SSE2_SUPPORTED __builtin_cpu_supports("sse2")
 #    elif defined(_MSC_VER)
